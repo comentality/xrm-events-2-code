@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>Events2Code</AssemblyName>
+    <RootNamespace>Events2Code</RootNamespace>
+    <Version>1.0.0</Version>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Company>Comentality</Company>
+    <Authors>Comentality</Authors>
+    <Description>Convert Dynamics 365 form event handler registrations made in the form designer UI into equivalent JavaScript code, and unregister them from the form.</Description>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <NuspecFile>Events2Code.nuspec</NuspecFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="XrmToolBoxPackage" Version="1.2025.7.71">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>

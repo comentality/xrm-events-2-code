@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>Events2Code</id>
+    <version>1.0.0</version>
+    <title>Events2Code</title>
+    <authors>Comentality</authors>
+    <license type="expression">MIT</license>
+    <projectUrl>https://github.com/comentality/xrm-events-2-code</projectUrl>
+    <icon>icon.png</icon>
+    <readme>docs\README.md</readme>
+    <description>Convert Dynamics 365 form event handler registrations made in the form designer UI into equivalent JavaScript code, and unregister them from the form.</description>
+    <releaseNotes>v1.0.0 - Initial release: parse form event registrations, generate JavaScript bootstrap, unregister UI handlers.</releaseNotes>
+    <tags>XrmToolBox Dynamics365 CRM PowerPlatform JavaScript FormEvents</tags>
+    <dependencies>
+      <group targetFramework=".NETFramework4.8">
+        <dependency id="XrmToolBox" version="1.2025.7.71" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="bin\Release\net48\Events2Code.dll" target="Plugins\Events2Code.dll" />
+    <file src="icon.png" target="icon.png" />
+    <file src="..\README.md" target="docs\README.md" />
+  </files>
+</package>
