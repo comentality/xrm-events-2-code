@@ -7,3 +7,5 @@ obj/
 .nuget-apikey
 artifacts/
 .env
+# The private XrmToolBox instance xtb.ps1 builds, including its connection and its token cache.
+tests/.xtb/
