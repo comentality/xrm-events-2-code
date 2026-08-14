@@ -43,6 +43,8 @@ namespace Events2Code
         private string _generatedCode = "";
 
         private bool _splittersLaid;
+        private bool _handlerPaneUserSized;
+        private Font _italic;
 
         // Left panel
         private SplitContainer _mainSplit;
@@ -218,6 +220,9 @@ namespace Events2Code
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Horizontal
             };
+            // SplitterMoving fires for a drag only; SplitterMoved would also fire for our own
+            // sizing and the grid would stop fitting itself after the very first form.
+            _rightSplit.SplitterMoving += (s, e) => _handlerPaneUserSized = true;
 
             _lvHandlers = new ListView
             {
@@ -234,10 +239,12 @@ namespace Events2Code
             _lvHandlers.Columns.Add("Function");
             _lvHandlers.Columns.Add("Library");
             _lvHandlers.Columns.Add("Parameters");
-            _lvHandlers.Columns.Add("Ctx");
-            _lvHandlers.Columns.Add("Enabled");
-            ShareWidthBetweenColumns(_lvHandlers, 720, 0.12f, 0.13f, 0.26f, 0.24f, 0.13f, 0.05f, 0.07f);
+            _lvHandlers.Columns.Add("Ctx", -1, HorizontalAlignment.Center);
+            _lvHandlers.Columns.Add("Enabled", -1, HorizontalAlignment.Center);
+            ShareWidthBetweenColumns(_lvHandlers, 800, 0.115f, 0.13f, 0.27f, 0.25f, 0.125f, 0.04f, 0.07f);
             _lvHandlers.ItemCheck += LvHandlers_ItemCheck;
+
+            _italic = new Font(_lvHandlers.Font, FontStyle.Italic);
 
             _txtCode = new RichTextBox
             {
@@ -265,6 +272,12 @@ namespace Events2Code
             base.OnLoad(e);
             LaySplitters();
             SetCueBanner(_txtFilter, "Filter tables...");
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && _italic != null) _italic.Dispose();
+            base.Dispose(disposing);
         }
 
         protected override void OnSizeChanged(EventArgs e)
@@ -540,8 +553,17 @@ namespace Events2Code
                 item.SubItems.Add(handler.FunctionName);
                 item.SubItems.Add(handler.LibraryName);
                 item.SubItems.Add(handler.Parameters);
-                item.SubItems.Add(handler.PassExecutionContext ? "yes" : "no");
-                item.SubItems.Add(handler.Enabled ? "yes" : "no");
+                item.SubItems.Add(Tick(handler.PassExecutionContext));
+                item.SubItems.Add(Tick(handler.Enabled));
+
+                // A handler the form has switched off starts unchecked and converting it would
+                // bring dead code back to life, so it should read as inert at a glance rather than
+                // differ from its neighbours by one word in the last column.
+                if (!handler.Enabled)
+                {
+                    item.Font = _italic;
+                    item.ToolTipText = "Registered on the form but disabled.";
+                }
                 if (!handler.IsConvertible)
                 {
                     item.ForeColor = Color.Gray;
@@ -551,11 +573,45 @@ namespace Events2Code
             }
             _lvHandlers.EndUpdate();
             _lvHandlers.ItemCheck += LvHandlers_ItemCheck;
+            FitHandlerPane();
 
             var convertible = _handlers.Count(h => h.IsConvertible);
             _lblStatus.Text = _handlers.Count == 0
                 ? "No handlers registered on this form."
                 : _handlers.Count + " handler(s), " + convertible + " convertible";
+        }
+
+        private static string Tick(bool value)
+        {
+            return value ? "✓" : "";
+        }
+
+        /// <summary>
+        /// A form usually has a handful of handlers, and leaving the grid at a fixed share of the
+        /// height means staring at an empty half while the generated code is squeezed underneath.
+        /// Size it to what it holds, within limits - but only until the splitter is dragged, after
+        /// which the height is the user's and reloading a form should not take it back.
+        /// </summary>
+        private void FitHandlerPane()
+        {
+            if (_handlerPaneUserSized || !_splittersLaid) return;
+
+            var wanted = 0;     // a form with no handlers shrinks to the minimum LaySplit enforces
+            if (_lvHandlers.Items.Count > 0)
+            {
+                var first = _lvHandlers.Items[0].Bounds;
+                wanted = first.Top                                      // column headers
+                       + (_lvHandlers.Items.Count + 1) * first.Height   // rows, plus one of slack
+                       + 8;
+
+                // Docked narrow the columns stop shrinking and the grid scrolls sideways instead;
+                // fitted this tightly, that scrollbar would sit on top of the last row.
+                var columns = _lvHandlers.Columns.Cast<ColumnHeader>().Sum(c => c.Width);
+                if (columns > _lvHandlers.ClientSize.Width)
+                    wanted += SystemInformation.HorizontalScrollBarHeight;
+            }
+
+            LaySplit(_rightSplit, 80, 120, Math.Min(wanted, (int)(_rightSplit.Height * 0.55)));
         }
 
         private void LvHandlers_ItemCheck(object sender, ItemCheckEventArgs e)
