@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Events2Code.Logic;
 using Microsoft.Crm.Sdk.Messages;
@@ -41,6 +42,8 @@ namespace Events2Code
         // for Copy/Save and let the preview control hold only the coloured rendering of it.
         private string _generatedCode = "";
 
+        private bool _splittersLaid;
+
         // Left panel
         private SplitContainer _mainSplit;
         private SplitContainer _leftSplit;
@@ -50,13 +53,14 @@ namespace Events2Code
         private ListView _lvForms;
 
         // Right panel
-        private Panel _toolbar;
+        private TableLayoutPanel _toolbar;
         private TextBox _txtBootstrapFn;
         private TextBox _txtBootstrapLib;
         private Button _btnGenerate;
         private Button _btnCopy;
         private Button _btnSave;
         private Button _btnUnregister;
+        private Label _lblStatus;
         private SplitContainer _rightSplit;
         private ListView _lvHandlers;
         private RichTextBox _txtCode;
@@ -74,7 +78,6 @@ namespace Events2Code
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
-                SplitterDistance = 280,
                 FixedPanel = FixedPanel.Panel1
             };
 
@@ -85,13 +88,31 @@ namespace Events2Code
                 Orientation = Orientation.Horizontal
             };
 
-            var leftToolbar = new Panel { Dock = DockStyle.Top, Height = 66, Padding = new Padding(5) };
-            _btnLoadEntities = new Button { Text = "Load Tables", Location = new Point(5, 5), Width = 130, Height = 26 };
+            var leftToolbar = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 37,
+                ColumnCount = 2,
+                RowCount = 1,
+                Padding = new Padding(5, 5, 5, 0)
+            };
+            leftToolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            leftToolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+
+            _btnLoadEntities = new Button
+            {
+                Text = "Load Tables",
+                Width = 110,
+                Height = 26,
+                Anchor = AnchorStyles.Left,
+                Margin = new Padding(0, 0, 6, 0)
+            };
             _btnLoadEntities.Click += BtnLoadEntities_Click;
-            _txtFilter = new TextBox { Location = new Point(5, 37), Width = 250 };
+            _txtFilter = new TextBox { Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new Padding(0) };
             _txtFilter.TextChanged += (s, e) => FillEntityList();
-            leftToolbar.Controls.Add(_btnLoadEntities);
-            leftToolbar.Controls.Add(_txtFilter);
+
+            leftToolbar.Controls.Add(_btnLoadEntities, 0, 0);
+            leftToolbar.Controls.Add(_txtFilter, 1, 0);
 
             _lvEntities = new ListView
             {
@@ -102,8 +123,9 @@ namespace Events2Code
                 HideSelection = false,
                 Font = new Font("Segoe UI", 9f)
             };
-            _lvEntities.Columns.Add("Table", 150);
-            _lvEntities.Columns.Add("Logical Name", 120);
+            _lvEntities.Columns.Add("Table");
+            _lvEntities.Columns.Add("Logical Name");
+            ShareWidthBetweenColumns(_lvEntities, 240, 0.56f, 0.44f);
             _lvEntities.SelectedIndexChanged += LvEntities_SelectedIndexChanged;
 
             _leftSplit.Panel1.Controls.Add(_lvEntities);
@@ -118,8 +140,9 @@ namespace Events2Code
                 HideSelection = false,
                 Font = new Font("Segoe UI", 9f)
             };
-            _lvForms.Columns.Add("Form", 170);
-            _lvForms.Columns.Add("Type", 90);
+            _lvForms.Columns.Add("Form");
+            _lvForms.Columns.Add("Type");
+            ShareWidthBetweenColumns(_lvForms, 220, 0.64f, 0.36f);
             _lvForms.SelectedIndexChanged += LvForms_SelectedIndexChanged;
 
             _leftSplit.Panel2.Controls.Add(_lvForms);
@@ -127,23 +150,68 @@ namespace Events2Code
             _mainSplit.Panel1.Controls.Add(_leftSplit);
 
             // ===== RIGHT: toolbar + handlers grid (top) + code (bottom) =====
-            _toolbar = new Panel { Dock = DockStyle.Top, Height = 66, Padding = new Padding(5) };
+            _toolbar = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 4,
+                RowCount = 2,
+                Padding = new Padding(5, 5, 5, 5)
+            };
+            _toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            _toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+            _toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            _toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+            _toolbar.RowStyles.Add(new RowStyle(SizeType.Absolute, 30f));
+            _toolbar.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-            var lblFn = new Label { Text = "Bootstrap function:", Location = new Point(5, 9), AutoSize = true };
-            _txtBootstrapFn = new TextBox { Location = new Point(115, 6), Width = 220, Text = "MyOrg.FormEvents.onLoad" };
-            var lblLib = new Label { Text = "Web resource:", Location = new Point(345, 9), AutoSize = true };
-            _txtBootstrapLib = new TextBox { Location = new Point(430, 6), Width = 220, Text = "new_/scripts/form_events.js" };
+            var lblFn = new Label { Text = "Bootstrap function:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 0, 6, 0) };
+            _txtBootstrapFn = new TextBox { Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new Padding(0, 0, 12, 0), Text = "MyOrg.FormEvents.onLoad" };
+            var lblLib = new Label { Text = "Web resource:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 0, 6, 0) };
+            _txtBootstrapLib = new TextBox { Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new Padding(0), Text = "new_/scripts/form_events.js" };
 
-            _btnGenerate = new Button { Text = "Generate Code", Location = new Point(5, 34), Width = 110, Height = 26, Enabled = false };
+            _toolbar.Controls.Add(lblFn, 0, 0);
+            _toolbar.Controls.Add(_txtBootstrapFn, 1, 0);
+            _toolbar.Controls.Add(lblLib, 2, 0);
+            _toolbar.Controls.Add(_txtBootstrapLib, 3, 0);
+
+            _btnGenerate = new Button { Text = "Generate Code", Width = 110, Height = 26, Enabled = false, Margin = new Padding(0, 0, 6, 0) };
             _btnGenerate.Click += BtnGenerate_Click;
-            _btnCopy = new Button { Text = "Copy", Location = new Point(120, 34), Width = 60, Height = 26, Enabled = false };
+            _btnCopy = new Button { Text = "Copy", Width = 60, Height = 26, Enabled = false, Margin = new Padding(0, 0, 6, 0) };
             _btnCopy.Click += (s, e) => { if (_generatedCode.Length > 0) Clipboard.SetText(_generatedCode); };
-            _btnSave = new Button { Text = "Save...", Location = new Point(185, 34), Width = 60, Height = 26, Enabled = false };
+            _btnSave = new Button { Text = "Save...", Width = 60, Height = 26, Enabled = false, Margin = new Padding(0, 0, 16, 0) };
             _btnSave.Click += BtnSave_Click;
-            _btnUnregister = new Button { Text = "Unregister UI Handlers", Location = new Point(255, 34), Width = 160, Height = 26, Enabled = false };
+            _btnUnregister = new Button { Text = "Unregister UI Handlers", Width = 160, Height = 26, Enabled = false, Margin = new Padding(0) };
             _btnUnregister.Click += BtnUnregister_Click;
+            // Wrapping rather than a fixed row: "Unregister UI Handlers" is wide enough that the
+            // row does not fit beside the status once the tool is docked narrow, and a button
+            // that falls to a second line beats one clipped in half.
+            var buttonRow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Margin = new Padding(0, 4, 0, 0)
+            };
+            buttonRow.Controls.AddRange(new Control[] { _btnGenerate, _btnCopy, _btnSave, _btnUnregister });
+            _toolbar.Controls.Add(buttonRow, 0, 1);
+            _toolbar.SetColumnSpan(buttonRow, 3);
 
-            _toolbar.Controls.AddRange(new Control[] { lblFn, _txtBootstrapFn, lblLib, _txtBootstrapLib, _btnGenerate, _btnCopy, _btnSave, _btnUnregister });
+            // Its own cell rather than the end of the button row: in the flow panel a long status
+            // would be clipped by the buttons as soon as the tool got narrow.
+            _lblStatus = new Label
+            {
+                AutoSize = false,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleRight,
+                AutoEllipsis = true,
+                ForeColor = SystemColors.GrayText,
+                Margin = new Padding(12, 4, 0, 0)
+            };
+            _toolbar.Controls.Add(_lblStatus, 3, 1);
 
             _rightSplit = new SplitContainer
             {
@@ -158,15 +226,17 @@ namespace Events2Code
                 FullRowSelect = true,
                 CheckBoxes = true,
                 HideSelection = false,
+                ShowItemToolTips = true,
                 Font = new Font("Segoe UI", 9f)
             };
-            _lvHandlers.Columns.Add("Event", 110);
-            _lvHandlers.Columns.Add("Target", 130);
-            _lvHandlers.Columns.Add("Function", 220);
-            _lvHandlers.Columns.Add("Library", 200);
-            _lvHandlers.Columns.Add("Parameters", 120);
-            _lvHandlers.Columns.Add("Ctx", 40);
-            _lvHandlers.Columns.Add("Enabled", 60);
+            _lvHandlers.Columns.Add("Event");
+            _lvHandlers.Columns.Add("Target");
+            _lvHandlers.Columns.Add("Function");
+            _lvHandlers.Columns.Add("Library");
+            _lvHandlers.Columns.Add("Parameters");
+            _lvHandlers.Columns.Add("Ctx");
+            _lvHandlers.Columns.Add("Enabled");
+            ShareWidthBetweenColumns(_lvHandlers, 720, 0.12f, 0.13f, 0.26f, 0.24f, 0.13f, 0.05f, 0.07f);
             _lvHandlers.ItemCheck += LvHandlers_ItemCheck;
 
             _txtCode = new RichTextBox
@@ -188,6 +258,87 @@ namespace Events2Code
 
             Controls.Add(_mainSplit);
             ResumeLayout(false);
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            LaySplitters();
+            SetCueBanner(_txtFilter, "Filter tables...");
+        }
+
+        protected override void OnSizeChanged(EventArgs e)
+        {
+            base.OnSizeChanged(e);
+            // Only until it takes: after that the splitters belong to whoever drags them.
+            if (!_splittersLaid) LaySplitters();
+        }
+
+        /// <summary>
+        /// Panel sizes are validated against the container's *current* size, and during
+        /// InitializeComponent that is still the 150x100 default a SplitContainer starts at: a
+        /// distance set there is silently shrunk to fit and a min size set there throws outright.
+        /// Both have to wait until the tool has been handed its real size, which is Load unless
+        /// XrmToolBox builds the tab while it is still hidden - hence the retry from OnSizeChanged.
+        /// </summary>
+        private void LaySplitters()
+        {
+            _splittersLaid =
+                LaySplit(_mainSplit, 220, 380, Math.Min(360, (int)(_mainSplit.Width * 0.3))) &
+                LaySplit(_leftSplit, 120, 80, (int)(_leftSplit.Height * 0.6)) &
+                LaySplit(_rightSplit, 80, 120, (int)(_rightSplit.Height * 0.35));
+        }
+
+        private static bool LaySplit(SplitContainer split, int min1, int min2, int distance)
+        {
+            var span = split.Orientation == Orientation.Vertical ? split.Width : split.Height;
+            if (span < min1 + min2 + split.SplitterWidth) return false;
+
+            split.Panel1MinSize = min1;
+            split.Panel2MinSize = min2;
+            split.SplitterDistance = Math.Min(Math.Max(distance, min1), span - min2 - split.SplitterWidth);
+            return true;
+        }
+
+        /// <summary>
+        /// Detail columns are plain pixel widths, so a list narrower than their sum scrolls
+        /// sideways and a wider one leaves dead space past the last column. Give each column a
+        /// share of the list instead and redistribute it whenever the list is resized. Below
+        /// <paramref name="minTotal"/> the shares would ellipsise every cell down to nothing, so
+        /// the columns stop shrinking there and the list scrolls sideways as before.
+        /// </summary>
+        private static void ShareWidthBetweenColumns(ListView list, int minTotal, params float[] shares)
+        {
+            EventHandler apply = (s, e) =>
+            {
+                var available = Math.Max(list.ClientSize.Width - 4, minTotal);
+                if (available <= 0) return;
+
+                list.BeginUpdate();
+                var used = 0;
+                for (var i = 0; i < list.Columns.Count; i++)
+                {
+                    // The last column absorbs the rounding so the widths always add up exactly.
+                    var width = i == list.Columns.Count - 1 ? available - used : (int)(available * shares[i]);
+                    list.Columns[i].Width = width;
+                    used += width;
+                }
+                list.EndUpdate();
+            };
+
+            list.ClientSizeChanged += apply;
+            apply(list, EventArgs.Empty);
+        }
+
+        private const int EM_SETCUEBANNER = 0x1501;
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, string lParam);
+
+        private static void SetCueBanner(TextBox box, string text)
+        {
+            if (box.IsHandleCreated)
+                SendMessage(box.Handle, EM_SETCUEBANNER, IntPtr.Zero, text);
         }
 
         // ===== Entities =====
@@ -392,11 +543,19 @@ namespace Events2Code
                 item.SubItems.Add(handler.PassExecutionContext ? "yes" : "no");
                 item.SubItems.Add(handler.Enabled ? "yes" : "no");
                 if (!handler.IsConvertible)
+                {
                     item.ForeColor = Color.Gray;
+                    item.ToolTipText = "Cannot be converted: " + handler.SkipReason + ".";
+                }
                 _lvHandlers.Items.Add(item);
             }
             _lvHandlers.EndUpdate();
             _lvHandlers.ItemCheck += LvHandlers_ItemCheck;
+
+            var convertible = _handlers.Count(h => h.IsConvertible);
+            _lblStatus.Text = _handlers.Count == 0
+                ? "No handlers registered on this form."
+                : _handlers.Count + " handler(s), " + convertible + " convertible";
         }
 
         private void LvHandlers_ItemCheck(object sender, ItemCheckEventArgs e)
@@ -412,6 +571,7 @@ namespace Events2Code
             _currentFormXml = null;
             _handlers = new List<EventHandlerInfo>();
             _lvHandlers.Items.Clear();
+            _lblStatus.Text = "";
             _generatedCode = "";
             _txtCode.Clear();
             _btnGenerate.Enabled = false;
