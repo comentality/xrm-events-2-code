@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/tests/">
     <Project Path="tests/Events2Code.E2ETests/Events2Code.E2ETests.csproj" />
+    <Project Path="tests/Events2Code.UiHarness/Events2Code.UiHarness.csproj" />
   </Folder>
   <Project Path="Events2Code/Events2Code.csproj" />
 </Solution>
