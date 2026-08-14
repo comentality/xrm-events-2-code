@@ -37,6 +37,10 @@ namespace Events2Code
         private string _currentFormXml;
         private List<EventHandlerInfo> _handlers = new List<EventHandlerInfo>();
 
+        // RichTextBox.Text normalises line breaks to LF, so keep the generated source verbatim
+        // for Copy/Save and let the preview control hold only the coloured rendering of it.
+        private string _generatedCode = "";
+
         // Left panel
         private SplitContainer _mainSplit;
         private SplitContainer _leftSplit;
@@ -55,7 +59,7 @@ namespace Events2Code
         private Button _btnUnregister;
         private SplitContainer _rightSplit;
         private ListView _lvHandlers;
-        private TextBox _txtCode;
+        private RichTextBox _txtCode;
 
         public Events2CodeControl()
         {
@@ -133,7 +137,7 @@ namespace Events2Code
             _btnGenerate = new Button { Text = "Generate Code", Location = new Point(5, 34), Width = 110, Height = 26, Enabled = false };
             _btnGenerate.Click += BtnGenerate_Click;
             _btnCopy = new Button { Text = "Copy", Location = new Point(120, 34), Width = 60, Height = 26, Enabled = false };
-            _btnCopy.Click += (s, e) => { if (_txtCode.Text.Length > 0) Clipboard.SetText(_txtCode.Text); };
+            _btnCopy.Click += (s, e) => { if (_generatedCode.Length > 0) Clipboard.SetText(_generatedCode); };
             _btnSave = new Button { Text = "Save...", Location = new Point(185, 34), Width = 60, Height = 26, Enabled = false };
             _btnSave.Click += BtnSave_Click;
             _btnUnregister = new Button { Text = "Unregister UI Handlers", Location = new Point(255, 34), Width = 160, Height = 26, Enabled = false };
@@ -165,13 +169,14 @@ namespace Events2Code
             _lvHandlers.Columns.Add("Enabled", 60);
             _lvHandlers.ItemCheck += LvHandlers_ItemCheck;
 
-            _txtCode = new TextBox
+            _txtCode = new RichTextBox
             {
                 Dock = DockStyle.Fill,
-                Multiline = true,
                 ReadOnly = true,
-                ScrollBars = ScrollBars.Both,
+                ScrollBars = RichTextBoxScrollBars.Both,
                 WordWrap = false,
+                DetectUrls = false,
+                BackColor = Color.White,
                 Font = new Font("Consolas", 9.5f)
             };
 
@@ -358,7 +363,8 @@ namespace Events2Code
                     _btnUnregister.Enabled = false;
                     _btnCopy.Enabled = false;
                     _btnSave.Enabled = false;
-                    _txtCode.Text = "";
+                    _generatedCode = "";
+                    _txtCode.Clear();
 
                     if (form.IsManaged)
                         MessageBox.Show("This form is managed. Unregistering handlers will create an unmanaged customization on top of it.",
@@ -406,7 +412,8 @@ namespace Events2Code
             _currentFormXml = null;
             _handlers = new List<EventHandlerInfo>();
             _lvHandlers.Items.Clear();
-            _txtCode.Text = "";
+            _generatedCode = "";
+            _txtCode.Clear();
             _btnGenerate.Enabled = false;
             _btnCopy.Enabled = false;
             _btnSave.Enabled = false;
@@ -439,7 +446,8 @@ namespace Events2Code
                 return;
             }
 
-            _txtCode.Text = JsCodeGenerator.Generate(selected, bootstrapFn, _selectedEntity, _selectedForm?.Name ?? "");
+            _generatedCode = JsCodeGenerator.Generate(selected, bootstrapFn, _selectedEntity, _selectedForm?.Name ?? "");
+            JsSyntaxHighlighter.Apply(_txtCode, _generatedCode);
             _btnCopy.Enabled = true;
             _btnSave.Enabled = true;
             _btnUnregister.Enabled = true;
@@ -454,7 +462,7 @@ namespace Events2Code
             })
             {
                 if (dialog.ShowDialog() == DialogResult.OK)
-                    File.WriteAllText(dialog.FileName, _txtCode.Text);
+                    File.WriteAllText(dialog.FileName, _generatedCode);
             }
         }
 
