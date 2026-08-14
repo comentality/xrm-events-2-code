@@ -63,6 +63,58 @@ namespace Events2Code.E2ETests
                 "All UI handlers should come from the fixture library");
         }
 
+        /// <summary>
+        /// The stock handler lives in &lt;InternalHandlers&gt;, so it must be listed but never
+        /// offered for conversion: converting it would strip form logic Dynamics owns.
+        /// </summary>
+        [Test, Order(1)]
+        public void Parse_MarksInternalHandlerAsNotConvertible()
+        {
+            var parsed = FormXmlParser.Parse(_fixtureFormXml);
+
+            var stock = parsed.Handlers.Single(h => h.FunctionName == InternalOnLoadFunction);
+            Assert.That(stock.IsInternal, Is.True, "the AppCommon handler sits in <InternalHandlers>");
+            Assert.That(stock.IsConvertible, Is.False, "internal handlers must never be convertible");
+            Assert.That(stock.KindDisplay, Is.EqualTo("onload (internal)"));
+
+            Assert.That(E2EHandlers(parsed).All(h => !h.IsInternal && h.IsConvertible),
+                "every designer-registered fixture handler stays convertible");
+        }
+
+        /// <summary>
+        /// The UI cannot check an internal handler, but the rewriter refuses to remove one
+        /// independently of that: pass every parsed handler in and the stock one survives.
+        /// </summary>
+        [Test, Order(1)]
+        public void Rewrite_RefusesToRemoveInternalHandler()
+        {
+            var everything = FormXmlParser.Parse(_fixtureFormXml).Handlers;
+            Assert.That(everything.Any(h => h.IsInternal), "fixture must contain an internal handler");
+
+            var rewritten = FormXmlRewriter.Rewrite(_fixtureFormXml, everything, BootstrapFunction, FixtureReset.BootstrapWebResourceName);
+            var parsed = FormXmlParser.Parse(rewritten);
+
+            Assert.That(parsed.Handlers.Select(h => h.FunctionName),
+                Is.EquivalentTo(new[] { InternalOnLoadFunction, BootstrapFunction }),
+                "the internal handler survives even when explicitly passed for removal");
+            Assert.That(parsed.Handlers.Single(h => h.FunctionName == InternalOnLoadFunction).IsInternal, Is.True);
+        }
+
+        /// <summary>Skipped handlers are still reported in the generated file, with the reason.</summary>
+        [Test, Order(2)]
+        public void Generate_ListsInternalHandlerAsNotConverted()
+        {
+            var everything = FormXmlParser.Parse(_fixtureFormXml).Handlers;
+
+            var js = JsCodeGenerator.Generate(everything, BootstrapFunction, "contact", "E2E Events Test");
+
+            Assert.That(js, Does.Contain("// NOT converted - left registered on the form:"));
+            Assert.That(js, Does.Contain(InternalOnLoadFunction));
+            Assert.That(js, Does.Contain("[internal handler, owned by Dynamics]"));
+            Assert.That(js, Does.Not.Contain(InternalOnLoadFunction + "(executionContext);"),
+                "the internal handler must not be called from the bootstrap");
+        }
+
         private static void AssertHandler(ParsedForm parsed, EventKind kind, string target, string fn,
             bool enabled, bool ctx, string parameters)
         {
@@ -91,18 +143,20 @@ namespace Events2Code.E2ETests
             // OnSave: exec context + no params registers the function reference directly
             Assert.That(js, Does.Contain("formContext.data.entity.addOnSave(E2ETest.onSave);"));
 
-            // OnChange
-            Assert.That(js, Does.Contain("formContext.getAttribute(\"firstname\").addOnChange(E2ETest.onFirstNameChange);"));
+            // OnChange: ?. guards a field that is missing from this form variant
+            Assert.That(js, Does.Contain("formContext.getAttribute(\"firstname\")?.addOnChange(E2ETest.onFirstNameChange);"));
             // Disabled handler is emitted commented out, with its parameters preserved in a wrapper
-            Assert.That(js, Does.Contain("// (disabled in designer) formContext.getAttribute(\"lastname\").addOnChange(function (executionContext) { E2ETest.onLastNameChange(executionContext, 'test'); });"));
+            Assert.That(js, Does.Contain("// (disabled in designer) formContext.getAttribute(\"lastname\")?.addOnChange(function (executionContext) { E2ETest.onLastNameChange(executionContext, 'test'); });"));
 
-            // Tab state change with null guard; no exec context -> wrapper calls with no args
-            Assert.That(js, Does.Contain("var tab_DETAILS_TAB = formContext.ui.tabs.get(\"DETAILS_TAB\");"));
-            Assert.That(js, Does.Contain("if (tab_DETAILS_TAB) { tab_DETAILS_TAB.addTabStateChange(function (executionContext) { E2ETest.onDetailsTabStateChange(); }); }"));
+            // Tab state change; no exec context -> wrapper calls with no args
+            Assert.That(js, Does.Contain("formContext.ui.tabs.get(\"DETAILS_TAB\")?.addTabStateChange(function (executionContext) { E2ETest.onDetailsTabStateChange(); });"));
 
-            // Subgrid OnLoad with null guard
-            Assert.That(js, Does.Contain("var grid_Subgrid_e2e = formContext.getControl(\"Subgrid_e2e\");"));
-            Assert.That(js, Does.Contain("if (grid_Subgrid_e2e) { grid_Subgrid_e2e.addOnLoad(E2ETest.onSubgridLoad); }"));
+            // Subgrid OnLoad
+            Assert.That(js, Does.Contain("formContext.getControl(\"Subgrid_e2e\")?.addOnLoad(E2ETest.onSubgridLoad);"));
+
+            // Every registration is a single statement - no hand-indented multi-line emit
+            Assert.That(js, Does.Not.Contain("var tab_"));
+            Assert.That(js, Does.Not.Contain("var grid_"));
 
             // Original form OnLoad handlers called directly from the bootstrap
             Assert.That(js, Does.Contain("E2ETest.onFormLoad(executionContext);"));

@@ -17,6 +17,10 @@ namespace Events2Code.Logic
 
             foreach (var handler in AllHandlers(doc).ToList())
             {
+                // Belt and braces: internal handlers are never converted, so removing one would
+                // silently drop form logic Dynamics owns. Refuse regardless of what was passed in.
+                if (FormXmlParser.IsInternalHandler(handler)) continue;
+
                 var uniqueId = (string)handler.Attribute("handlerUniqueId") ?? "";
                 var fn = (string)handler.Attribute("functionName") ?? "";
                 var lib = (string)handler.Attribute("libraryName") ?? "";

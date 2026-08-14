@@ -10,10 +10,12 @@ Registering event handlers through the form designer (Form Properties → Event 
 - **List registrations** — every UI-registered handler with event type, target, function, library, parameters, and enabled state
 - **Generate JavaScript** — produces a single OnLoad bootstrap function that registers the checked handlers programmatically:
   - Form OnSave → `formContext.data.entity.addOnSave(...)`
-  - Attribute OnChange → `formContext.getAttribute(...).addOnChange(...)`
-  - Tab state change → `formContext.ui.tabs.get(...).addTabStateChange(...)`
-  - Subgrid OnLoad → `formContext.getControl(...).addOnLoad(...)` (with null guard)
+  - Attribute OnChange → `formContext.getAttribute(...)?.addOnChange(...)`
+  - Tab state change → `formContext.ui.tabs.get(...)?.addTabStateChange(...)`
+  - Subgrid OnLoad → `formContext.getControl(...)?.addOnLoad(...)`
   - Original form OnLoad handlers → called directly from the bootstrap
+
+  Lookups are guarded with `?.` so a field, tab, or grid missing from the current form variant is skipped instead of throwing and killing every registration after it. This makes the output ES2020 — fine for Unified Interface, but check any minifier or ESLint config pinned to ES5.
 - **Handles designer quirks** — extra handler parameters and the "pass execution context" flag are preserved via wrapper closures; disabled handlers are emitted commented out
 - **Unregister UI handlers** — removes the checked handlers from the form XML, registers your bootstrap function on form OnLoad, adds its web resource to the form libraries, updates the form, and publishes
 - **Safety first** — the original form XML is backed up to `Documents\Events2Code\backups` before any change, and managed forms trigger a warning

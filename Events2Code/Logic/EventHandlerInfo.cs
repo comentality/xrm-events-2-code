@@ -22,12 +22,24 @@ namespace Events2Code.Logic
         public bool Enabled { get; set; }
         public string HandlerUniqueId { get; set; }
 
-        public bool IsConvertible => Kind != EventKind.Other;
+        /// <summary>
+        /// Registered by Dynamics itself rather than through the form designer: these live in
+        /// &lt;InternalHandlers&gt; instead of &lt;Handlers&gt;. Never ours to convert or remove.
+        /// </summary>
+        public bool IsInternal { get; set; }
+
+        public bool IsConvertible => Kind != EventKind.Other && !IsInternal;
+
+        public string SkipReason => IsInternal
+            ? "internal handler, owned by Dynamics"
+            : "no programmatic registration API";
 
         public string KindDisplay
         {
             get
             {
+                if (IsInternal) return EventName + " (internal)";
+
                 switch (Kind)
                 {
                     case EventKind.FormOnLoad: return "Form OnLoad";

@@ -54,12 +54,22 @@ namespace Events2Code.Logic
                         Parameters = (string)handler.Attribute("parameters") ?? "",
                         PassExecutionContext = string.Equals((string)handler.Attribute("passExecutionContext"), "true", StringComparison.OrdinalIgnoreCase),
                         Enabled = !string.Equals((string)handler.Attribute("enabled"), "false", StringComparison.OrdinalIgnoreCase),
-                        HandlerUniqueId = (string)handler.Attribute("handlerUniqueId") ?? ""
+                        HandlerUniqueId = (string)handler.Attribute("handlerUniqueId") ?? "",
+                        IsInternal = IsInternalHandler(handler)
                     });
                 }
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Dynamics' own registrations sit in &lt;InternalHandlers&gt;; the ones made in the form
+        /// designer sit in &lt;Handlers&gt;. Both are Handler elements, so only the parent tells them apart.
+        /// </summary>
+        public static bool IsInternalHandler(XElement handler)
+        {
+            return handler.Ancestors().Any(a => a.Name.LocalName.Equals("InternalHandlers", StringComparison.OrdinalIgnoreCase));
         }
 
         private static EventKind Classify(string eventName, string attribute, string tabName, string controlId)

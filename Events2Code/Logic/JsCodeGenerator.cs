@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace Events2Code.Logic
 {
@@ -28,35 +27,17 @@ namespace Events2Code.Logic
                 h => "formContext.data.entity.addOnSave(" + HandlerExpression(h) + ");");
 
             AppendSection(sb, "Attribute OnChange", convertible.Where(h => h.Kind == EventKind.AttributeOnChange),
-                h => "formContext.getAttribute(\"" + h.TargetName + "\").addOnChange(" + HandlerExpression(h) + ");");
+                h => "formContext.getAttribute(\"" + h.TargetName + "\")?.addOnChange(" + HandlerExpression(h) + ");");
 
-            var tabs = convertible.Where(h => h.Kind == EventKind.TabStateChange).ToList();
-            if (tabs.Count > 0)
-            {
-                sb.AppendLine();
-                sb.AppendLine("    // --- Tab state change ---");
-                foreach (var h in tabs)
-                {
-                    var local = "tab_" + Sanitize(h.TargetName);
-                    sb.AppendLine(Statement(h,
-                        "var " + local + " = formContext.ui.tabs.get(\"" + h.TargetName + "\");\n" +
-                        "    if (" + local + ") { " + local + ".addTabStateChange(" + HandlerExpression(h) + "); }"));
-                }
-            }
+            AppendSection(sb, "Tab state change", convertible.Where(h => h.Kind == EventKind.TabStateChange),
+                h => "formContext.ui.tabs.get(\"" + h.TargetName + "\")?.addTabStateChange(" + HandlerExpression(h) + ");");
 
-            var grids = convertible.Where(h => h.Kind == EventKind.GridOnLoad).ToList();
-            if (grids.Count > 0)
-            {
-                sb.AppendLine();
-                sb.AppendLine("    // --- Subgrid OnLoad (grid controls may not exist yet at form OnLoad) ---");
-                foreach (var h in grids)
-                {
-                    var local = "grid_" + Sanitize(h.TargetName);
-                    sb.AppendLine(Statement(h,
-                        "var " + local + " = formContext.getControl(\"" + h.TargetName + "\");\n" +
-                        "    if (" + local + ") { " + local + ".addOnLoad(" + HandlerExpression(h) + "); }"));
-                }
-            }
+            // TODO: a subgrid on a collapsed or non-default tab is not instantiated at form OnLoad,
+            // so getControl returns null, ?. skips the registration and the handler silently never
+            // runs. Register those from the owning tab's state change instead of at OnLoad.
+            AppendSection(sb, "Subgrid OnLoad (grid controls may not exist yet at form OnLoad)",
+                convertible.Where(h => h.Kind == EventKind.GridOnLoad),
+                h => "formContext.getControl(\"" + h.TargetName + "\")?.addOnLoad(" + HandlerExpression(h) + ");");
 
             AppendSection(sb, "Original form OnLoad handlers", convertible.Where(h => h.Kind == EventKind.FormOnLoad),
                 h => h.FunctionName + "(" + CallArguments(h) + ");");
@@ -67,9 +48,10 @@ namespace Events2Code.Logic
             if (skipped.Count > 0)
             {
                 sb.AppendLine();
-                sb.AppendLine("// NOT converted (no programmatic registration API) - left registered on the form:");
+                sb.AppendLine("// NOT converted - left registered on the form:");
                 foreach (var h in skipped)
-                    sb.AppendLine("//   " + h.EventName + " " + h.TargetName + " -> " + h.FunctionName + " (" + h.LibraryName + ")");
+                    sb.AppendLine("//   " + h.EventName + " " + h.TargetName + " -> " + h.FunctionName +
+                                  " (" + h.LibraryName + ") [" + h.SkipReason + "]");
             }
 
             return sb.ToString();
@@ -102,7 +84,7 @@ namespace Events2Code.Logic
         {
             return h.Enabled
                 ? "    " + code
-                : "    // (disabled in designer) " + code.Replace("\n", "\n    // ");
+                : "    // (disabled in designer) " + code;
         }
 
         // UI registrations pass execution context first (when checked), then the comma-separated parameters.
@@ -119,11 +101,6 @@ namespace Events2Code.Logic
             if (h.PassExecutionContext) args.Add("executionContext");
             if (!string.IsNullOrWhiteSpace(h.Parameters)) args.Add(h.Parameters.Trim());
             return string.Join(", ", args);
-        }
-
-        private static string Sanitize(string name)
-        {
-            return Regex.Replace(name ?? "", "[^A-Za-z0-9_]", "_");
         }
     }
 }
