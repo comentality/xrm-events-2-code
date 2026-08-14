@@ -6,3 +6,4 @@ obj/
 .claude/
 .nuget-apikey
 artifacts/
+.env

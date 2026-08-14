@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/Events2Code.E2ETests/Events2Code.E2ETests.csproj" />
+  </Folder>
+  <Project Path="Events2Code/Events2Code.csproj" />
+</Solution>
