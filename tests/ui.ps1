@@ -9,6 +9,11 @@
 #   .\ui.ps1 -Size 1280x900,820x620   # several
 #   .\ui.ps1 -NoBuild                 # reuse the last build
 #
+# The screenshots in docs\images come from here too, with the bigger sample form and a name of
+# their own - regenerate them with:
+#
+#   .\ui.ps1 -Size 1280x820 -Scene showcase -Name overview -Title Events2Code -OutputDir ..\docs\images
+#
 # It drives the real control, so it screenshots real bugs: a splitter that throws while being set
 # up shows here as a failed run rather than as a broken tab in XrmToolBox. Note that it captures
 # the screen, so the desktop must be unlocked and the window is briefly topmost.
@@ -16,8 +21,18 @@
 param(
     [string[]]$Size = @("1280x900", "820x620"),
     [string]$OutputDir,
+    # Which sample form to load: "layout" is the small one, "showcase" carries one of every
+    # convertible event and is what the documentation screenshots use.
+    [ValidateSet("layout", "showcase")]
+    [string]$Scene = "layout",
+    # File name (without extension) for the shot; only valid for a single size, since several
+    # sizes would all write to it in turn. Defaults to the size, e.g. 1280x900.png.
+    [string]$Name,
+    [string]$Title,
     [switch]$NoBuild
 )
+
+if ($Name -and $Size.Count -ne 1) { throw "-Name takes a single -Size, got $($Size.Count)" }
 
 $ErrorActionPreference = "Stop"
 
@@ -38,12 +53,13 @@ foreach ($s in $Size) {
     $width  = [int]$Matches[1]
     $height = [int]$Matches[2]
 
-    $path = Join-Path $OutputDir "$($width)x$($height).png"
+    $file = if ($Name) { $Name } else { "$($width)x$($height)" }
+    $path = Join-Path $OutputDir "$file.png"
     Remove-Item "$path*" -ErrorAction SilentlyContinue
 
     # Out of process with a timeout: a layout that deadlocks the message loop should fail the run
     # rather than hang it.
-    $p = Start-Process $exe -ArgumentList $width, $height, $path -PassThru
+    $p = Start-Process $exe -ArgumentList $width, $height, "`"$path`"", $Scene, "`"$Title`"" -PassThru
     if (-not $p.WaitForExit(30000)) {
         $p.Kill()
         Write-Host "TIMED OUT  $($width)x$($height)" -ForegroundColor Red

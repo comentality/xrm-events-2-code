@@ -16,12 +16,17 @@ namespace Events2Code.UiHarness
     /// layout work can be checked without XrmToolBox and without a Dataverse connection. Run it
     /// through ui.ps1 rather than directly.
     ///
-    ///   uiharness.exe &lt;width&gt; &lt;height&gt; &lt;output.png&gt;
+    ///   uiharness.exe &lt;width&gt; &lt;height&gt; &lt;output.png&gt; [scene] [window title]
     ///
     /// The control is driven the way XrmToolBox drives it - construct, dock, show - so anything
     /// the real tool does on Load and Resize happens here too. Sample data goes in through
     /// reflection: the lists and their backing fields are private, and exposing them for a test
     /// harness would be a worse trade than this file knowing their names.
+    ///
+    /// Scenes decide which sample form is loaded. "layout" is the small one layout work is checked
+    /// against; "showcase" is a form with one of every convertible event on it, which is what the
+    /// screenshots in docs are taken from. The code pane is filled by the real generator either
+    /// way, so a screenshot cannot drift away from what the tool actually emits.
     /// </summary>
     internal static class Program
     {
@@ -32,13 +37,15 @@ namespace Events2Code.UiHarness
         {
             if (args.Length < 3)
             {
-                Console.Error.WriteLine("usage: uiharness.exe <width> <height> <output.png>");
+                Console.Error.WriteLine("usage: uiharness.exe <width> <height> <output.png> [scene] [window title]");
                 return 2;
             }
 
             var width = int.Parse(args[0]);
             var height = int.Parse(args[1]);
             var outPath = args[2];
+            var scene = args.Length > 3 && args[3].Length > 0 ? args[3] : "layout";
+            var title = args.Length > 4 && args[4].Length > 0 ? args[4] : "Events2Code UI harness";
 
             // Without this a layout mistake surfaces as a modal error dialog on a machine nobody
             // is looking at, and the run just hangs until it is killed.
@@ -52,7 +59,7 @@ namespace Events2Code.UiHarness
             var control = new Events2CodeControl { Dock = DockStyle.Fill };
             var form = new Form
             {
-                Text = "Events2Code UI harness",
+                Text = title,
                 ClientSize = new Size(width, height),
                 StartPosition = FormStartPosition.Manual,
                 Location = new Point(0, 0),
@@ -62,7 +69,7 @@ namespace Events2Code.UiHarness
 
             form.Shown += (s, e) =>
             {
-                try { Populate(control); }
+                try { Populate(control, scene); }
                 catch (Exception ex) { failures.Add(ex.ToString()); }
 
                 // Let the form settle before grabbing it: the lists redistribute their columns on
@@ -128,8 +135,11 @@ namespace Events2Code.UiHarness
             return (T)field.GetValue(target);
         }
 
-        private static void Populate(Events2CodeControl control)
+        private static void Populate(Events2CodeControl control, string scene)
         {
+            var handlers = scene == "showcase" ? ShowcaseHandlers() : LayoutHandlers();
+            var formName = scene == "showcase" ? "Contact" : "Portal Contact (Enhanced)";
+
             FillList(Field<ListView>(control, "_lvEntities"), new[,]
             {
                 { "AI Builder Datasets Container", "msdyn_aibdatasetscontainer" },
@@ -153,9 +163,27 @@ namespace Events2Code.UiHarness
                 { "Profile Web Form (Enhanced)", "Main" },
             });
 
-            // One of each kind the grid renders differently: an internal handler it greys out and
-            // refuses to convert, a convertible one it checks, and a disabled one.
-            var handlers = new List<EventHandlerInfo>
+            control.GetType().GetField("_handlers", Priv).SetValue(control, handlers);
+            control.GetType().GetMethod("FillHandlersGrid", Priv).Invoke(control, null);
+
+            // Through the real generator rather than a canned string, so a screenshot of the code
+            // pane is the tool's actual output for the rows above it.
+            var code = JsCodeGenerator.Generate(handlers, "MyOrg.FormEvents.onLoad", "contact", formName);
+            Highlight(Field<RichTextBox>(control, "_txtCode"), code);
+
+            // Code in the pane and the buttons still greyed is a state the tool is never in, so
+            // put them where a real Generate would have left them.
+            foreach (var button in new[] { "_btnGenerate", "_btnCopy", "_btnSave", "_btnUnregister" })
+                Field<Button>(control, button).Enabled = true;
+        }
+
+        /// <summary>
+        /// One of each kind the grid renders differently: an internal handler it greys out and
+        /// refuses to convert, a convertible one it checks, and a disabled one.
+        /// </summary>
+        private static List<EventHandlerInfo> LayoutHandlers()
+        {
+            return new List<EventHandlerInfo>
             {
                 new EventHandlerInfo
                 {
@@ -191,11 +219,94 @@ namespace Events2Code.UiHarness
                     Enabled = false
                 },
             };
+        }
 
-            control.GetType().GetField("_handlers", Priv).SetValue(control, handlers);
-            control.GetType().GetMethod("FillHandlersGrid", Priv).Invoke(control, null);
-
-            Highlight(Field<RichTextBox>(control, "_txtCode"), SampleCode);
+        /// <summary>
+        /// A form carrying one of every event the tool can convert, plus the two it cannot, so a
+        /// single screenshot shows the whole vocabulary of the grid and of the generated code.
+        /// </summary>
+        private static List<EventHandlerInfo> ShowcaseHandlers()
+        {
+            return new List<EventHandlerInfo>
+            {
+                new EventHandlerInfo
+                {
+                    Kind = EventKind.FormOnLoad,
+                    EventName = "onload",
+                    TargetName = "",
+                    FunctionName = "MyOrg.Contact.onLoad",
+                    LibraryName = "new_/scripts/contact_main.js",
+                    Parameters = "",
+                    PassExecutionContext = true,
+                    Enabled = true
+                },
+                new EventHandlerInfo
+                {
+                    Kind = EventKind.FormOnSave,
+                    EventName = "onsave",
+                    TargetName = "",
+                    FunctionName = "MyOrg.Contact.onSave",
+                    LibraryName = "new_/scripts/contact_main.js",
+                    Parameters = "",
+                    PassExecutionContext = true,
+                    Enabled = true
+                },
+                new EventHandlerInfo
+                {
+                    Kind = EventKind.AttributeOnChange,
+                    EventName = "onchange",
+                    TargetName = "parentcustomerid",
+                    FunctionName = "MyOrg.Contact.onParentCustomerChanged",
+                    LibraryName = "new_/scripts/contact_main.js",
+                    Parameters = "\"accountid\", true",
+                    PassExecutionContext = true,
+                    Enabled = true
+                },
+                new EventHandlerInfo
+                {
+                    Kind = EventKind.AttributeOnChange,
+                    EventName = "onchange",
+                    TargetName = "emailaddress1",
+                    FunctionName = "MyOrg.Contact.validateEmail",
+                    LibraryName = "new_/scripts/contact_validation.js",
+                    Parameters = "",
+                    PassExecutionContext = false,
+                    Enabled = false
+                },
+                new EventHandlerInfo
+                {
+                    Kind = EventKind.TabStateChange,
+                    EventName = "tabstatechange",
+                    TargetName = "tab_details",
+                    FunctionName = "MyOrg.Contact.onDetailsTabToggled",
+                    LibraryName = "new_/scripts/contact_main.js",
+                    Parameters = "",
+                    PassExecutionContext = true,
+                    Enabled = true
+                },
+                new EventHandlerInfo
+                {
+                    Kind = EventKind.GridOnLoad,
+                    EventName = "onload",
+                    TargetName = "Cases",
+                    FunctionName = "MyOrg.Contact.onCasesGridLoad",
+                    LibraryName = "new_/scripts/contact_grids.js",
+                    Parameters = "",
+                    PassExecutionContext = true,
+                    Enabled = true
+                },
+                new EventHandlerInfo
+                {
+                    Kind = EventKind.Other,
+                    EventName = "setadditionalparams",
+                    TargetName = "general",
+                    FunctionName = "AppCommon.Contact.Instance.parentCustomerOnChange",
+                    LibraryName = "AppCommon/Contact/Contact_Main_Library.js",
+                    Parameters = "",
+                    Enabled = true,
+                    IsInternal = true
+                },
+            };
         }
 
         /// <summary>
@@ -222,21 +333,5 @@ namespace Events2Code.UiHarness
                 .GetMethod("Apply", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
                 .Invoke(null, new object[] { box, code });
         }
-
-        private const string SampleCode =
-            "// Generated by Events2Code (XrmToolBox) on 2026-08-14\n" +
-            "// Entity: contact   Form: Portal Contact (Enhanced)\n" +
-            "// Register ONLY this function on the form OnLoad event (pass execution context).\n" +
-            "\"use strict\";\n" +
-            "\n" +
-            "var MyOrg = MyOrg || {};\n" +
-            "MyOrg.FormEvents = MyOrg.FormEvents || {};\n" +
-            "\n" +
-            "MyOrg.FormEvents.onLoad = function (executionContext) {\n" +
-            "    var formContext = executionContext.getFormContext();\n" +
-            "\n" +
-            "    // --- Original form OnLoad handlers ---\n" +
-            "    mspp.subgrid_filtering.filterAssociatedRecords(executionContext);\n" +
-            "};\n";
     }
 }

@@ -7,10 +7,11 @@
     <authors>Comentality</authors>
     <license type="expression">MIT</license>
     <projectUrl>https://github.com/comentality/xrm-events-2-code</projectUrl>
+    <repository type="git" url="https://github.com/comentality/xrm-events-2-code.git" branch="main" />
     <icon>icon.png</icon>
     <readme>docs\README.md</readme>
     <description>Convert Dynamics 365 form event handler registrations made in the form designer UI into equivalent JavaScript code, and unregister them from the form.</description>
-    <releaseNotes>v1.0.0 - Initial release: parse form event registrations, generate JavaScript bootstrap, unregister UI handlers.</releaseNotes>
+    <releaseNotes>v1.0.0 - First public release: list the handlers a form registers through the designer, generate an OnLoad bootstrap that registers them through the Client API, and unregister them from the form. Full notes: https://github.com/comentality/xrm-events-2-code/blob/main/CHANGELOG.md</releaseNotes>
     <tags>XrmToolBox Dynamics365 CRM PowerPlatform JavaScript FormEvents</tags>
     <dependencies>
       <group targetFramework=".NETFramework4.8">
