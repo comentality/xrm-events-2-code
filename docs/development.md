@@ -86,6 +86,14 @@ imported into the environment; without the `.env` the suite skips itself with a 
 [tests/e2e-fixtures/README.md](../tests/e2e-fixtures/README.md) for deployment and for the form
 XML schema gotchas that fixture ran into.
 
+## The icon
+
+Three copies of the same artwork have to stay in step: `SmallImageBase64` (32×32) and
+`BigImageBase64` (80×80) in `Events2CodePlugin.cs`, and `Events2Code\icon.png` (80×80), which the
+nuspec ships. They are generated, not drawn by hand — the palette and the generator live in the
+[Comentality brand kit](https://github.com/comentality/comentality-brand), where `brand.py`
+renders the PNGs and prints the base64 to paste in.
+
 ## Releasing
 
 1. Bump `<Version>` in `Events2Code\Events2Code.csproj` and `<version>` in
