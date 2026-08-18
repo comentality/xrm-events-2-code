@@ -1,5 +1,7 @@
 # ![](https://raw.githubusercontent.com/comentality/xrm-events-2-code/main/Events2Code/icon.png) Events2Code
 
+[![NuGet](https://img.shields.io/nuget/v/Comentality.Events2Code)](https://www.nuget.org/packages/Comentality.Events2Code)
+
 An [XrmToolBox](https://www.xrmtoolbox.com/) tool that converts Dynamics 365 form event handler
 registrations made in the form designer UI into equivalent JavaScript code — and unregisters them
 from the form.
