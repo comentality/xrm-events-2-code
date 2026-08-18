@@ -94,6 +94,21 @@ nuspec ships. They are generated, not drawn by hand — the palette and the gene
 [Comentality brand kit](https://github.com/comentality/comentality-brand), where `brand.py`
 renders the PNGs and prints the base64 to paste in.
 
+`BackgroundColor` and `PrimaryFontColor` colour the tile XrmToolBox draws on its Tools list; they
+come from the kit's `tint` surface. `SecondaryFontColor` is set for completeness but has no
+observable effect there — the list draws every line, description included, in the primary colour.
+
+**Changing any of this and seeing no change means the metadata cache.** XrmToolBox keeps
+`Plugins\manifest.json` beside the assemblies and keys it on assembly path plus `Version`, not on
+file hash or timestamp. Rebuilding without bumping `<Version>` therefore leaves the old icon and
+colours on screen no matter how many times you relaunch. Delete the cache to force a rescan:
+
+```powershell
+Remove-Item tests\.xtb\Plugins\manifest.json
+```
+
+Releases are unaffected, since step 1 below bumps the version anyway.
+
 ## Releasing
 
 1. Bump `<Version>` in `Events2Code\Events2Code.csproj` and `<version>` in
