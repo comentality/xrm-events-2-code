@@ -3,7 +3,9 @@ obj/
 .vs/
 *.user
 *.suo
-.claude/
+# Local Claude state stays out; the skills are part of the project.
+.claude/*
+!.claude/skills/
 .nuget-apikey
 artifacts/
 .env
