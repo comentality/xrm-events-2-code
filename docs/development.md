@@ -70,6 +70,34 @@ cd tests
 
 Regenerating them rewrites the date in the generated-code header, which is the only churn.
 
+## Slow-link harness
+
+The UI harness asks what the window looks like. This one asks what it is doing while somebody
+waits, which is where the interesting bugs are: on a slow connection the panel XrmToolBox draws
+over a tab disables nothing, so every button stays live for the seconds an answer takes.
+
+```powershell
+.\tests\slow.ps1                          # every scenario into tests\.slow
+.\tests\slow.ps1 -Scenario cancel         # one
+.\tests\slow.ps1 -NoBuild                 # reuse the last build
+```
+
+It hosts the same control the UI harness photographs, but hands it a fake Dataverse through the
+connection property XrmToolBox would have set, with per-call latency and failures a scenario
+scripts. Everything is driven on the UI thread from a timer, because that is where `WorkAsync`
+marshals its callbacks back to; a scenario driven from anywhere else would be testing something
+nobody does. Each scenario gets a window, a screenshot per beat, and a line per finding, and the
+exit code is the number of scenarios with findings.
+
+The windows open past the edge of the desktop and never take the keyboard, so a run does not take
+over the machine — set `E2C_HARNESS_ONSCREEN=1` to watch one play out. One scenario presses
+Unregister, so the tool really does write a form backup to `Documents\Events2Code\backups`; the
+harness counts what appeared there and takes away only what it made.
+
+The sample environment is shared with the UI harness (`tests\harness`), so the two cannot
+disagree about what "the sample" is: the forms carry real form XML built from the same handler
+lists the screenshots use, and the tool parses it back with its own parser.
+
 ## End-to-end tests
 
 ```powershell

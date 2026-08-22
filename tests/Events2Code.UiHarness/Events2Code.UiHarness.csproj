@@ -8,6 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The sample environment and the window capture, shared with the slow harness so the two
+         cannot disagree about what "the sample" is. -->
+    <Compile Include="..\harness\*.cs" LinkBase="Harness" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\Events2Code\Events2Code.csproj" />
     <!-- The tool project keeps this package private, so the harness needs its own reference to
          compile against PluginControlBase, the base class of the control it hosts. -->

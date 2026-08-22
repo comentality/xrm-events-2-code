@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <!-- A console app that opens windows: the findings go to stdout, and the windows are what
+         the findings are about. -->
+    <OutputType>Exe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The sample environment and the window capture, shared with the UI harness so the two
+         cannot disagree about what "the sample" is. -->
+    <Compile Include="..\harness\*.cs" LinkBase="Harness" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Events2Code\Events2Code.csproj" />
+    <!-- The tool project keeps this package private, so the harness needs its own reference to
+         compile against PluginControlBase, the base class of the control it hosts. -->
+    <PackageReference Include="XrmToolBoxPackage" Version="1.2025.7.71">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>

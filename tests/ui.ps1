@@ -15,8 +15,9 @@
 #   .\ui.ps1 -Size 1280x820 -Scene showcase -Name overview -Title Events2Code -OutputDir ..\docs\images
 #
 # It drives the real control, so it screenshots real bugs: a splitter that throws while being set
-# up shows here as a failed run rather than as a broken tab in XrmToolBox. Note that it captures
-# the screen, so the desktop must be unlocked and the window is briefly topmost.
+# up shows here as a failed run rather than as a broken tab in XrmToolBox. The window opens past
+# the edge of the desktop and the shot is the window's own pixels, so a run does not take over the
+# machine - set E2C_HARNESS_ONSCREEN=1 to watch one happen.
 
 param(
     [string[]]$Size = @("1280x900", "820x620"),

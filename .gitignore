@@ -13,3 +13,5 @@ artifacts/
 tests/.xtb/
 # Layout screenshots from ui.ps1, rewritten on every run.
 tests/.ui/
+# Windows, shots and report from slow.ps1, rewritten on every run.
+tests/.slow/
