@@ -14,16 +14,14 @@ if (-not $ApiKey) {
 
 $project = Join-Path $PSScriptRoot "Events2Code\Events2Code.csproj"
 
-$nuspec = Join-Path $PSScriptRoot "Events2Code\Events2Code.nuspec"
-[xml]$spec = Get-Content $nuspec
-$version = $spec.package.metadata.version
-if ($spec.package.metadata.releaseNotes -notmatch [regex]::Escape("v$version")) {
-    Write-Host "releaseNotes in $(Split-Path $nuspec -Leaf) do not mention v$version. The store shows whatever ships; update the notes first." -ForegroundColor Red
-    exit 1
-}
-$changelog = Join-Path $PSScriptRoot "CHANGELOG.md"
-if ((Test-Path $changelog) -and ((Get-Content $changelog -Raw) -notmatch "## \[?$([regex]::Escape($version))")) {
-    Write-Host "CHANGELOG.md has no section for $version. Add one before publishing." -ForegroundColor Red
+# The store shows whatever ships, and a nupkg can never be replaced or deleted. So the notes
+# are generated from CHANGELOG.md rather than kept in step by hand: this fails the publish if
+# the nuspec is not what the changelog says, or if the version has no section behind it at
+# all. Run .\release-notes.ps1 -Write and commit the result.
+try {
+    & (Join-Path $PSScriptRoot "release-notes.ps1") -Check | Out-Null
+} catch {
+    Write-Host $_.Exception.Message -ForegroundColor Red
     exit 1
 }
 

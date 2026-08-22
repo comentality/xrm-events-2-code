@@ -11,7 +11,17 @@
     <icon>icon.png</icon>
     <readme>docs\README.md</readme>
     <description>Convert Dynamics 365 form event handler registrations made in the form designer UI into equivalent JavaScript code, and unregister them from the form.</description>
-    <releaseNotes>v1.0.0 - First public release: list the handlers a form registers through the designer, generate an OnLoad bootstrap that registers them through the Client API, and unregister them from the form. Full notes: https://github.com/comentality/xrm-events-2-code/blob/main/CHANGELOG.md</releaseNotes>
+    <releaseNotes>v1.0.0
+- Browse tables and their Main and Quick Create forms over an XrmToolBox connection, with a filter on display or logical name.
+- List every event handler a form registers through the designer, with its event, target, function, library and enabled state.
+- Generate a single OnLoad bootstrap function that registers the checked handlers through the Client API.
+- Designer quirks are preserved: extra parameters and the "pass execution context" flag are re-emitted through wrapper closures.
+- Copy the generated code to the clipboard or save it to a .js file.
+- Unregister the checked handlers: they leave the form XML, the bootstrap is registered on form OnLoad, and the table is published.
+- Back up the form XML to Documents\Events2Code\backups before any change, and warn on managed forms.
+- The generated-code preview is syntax highlighted.
+Full changelog, with screenshots: https://github.com/comentality/xrm-events-2-code/releases/tag/v1.0.0
+</releaseNotes>
     <tags>XrmToolBox Dynamics365 CRM PowerPlatform JavaScript FormEvents</tags>
     <dependencies>
       <group targetFramework=".NETFramework4.8">
