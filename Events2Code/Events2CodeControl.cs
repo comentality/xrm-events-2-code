@@ -46,6 +46,42 @@ namespace Events2Code
         private bool _handlerPaneUserSized;
         private Font _italic;
 
+        // ===== what is on the wire =====
+        //
+        // Everything the tool asks Dataverse is started by a click, and on a slow link every one
+        // of those clicks is seconds wide. Nothing disables the window while it waits - the panel
+        // XrmToolBox draws is a small box in the middle of the tab - so the tool has to know for
+        // itself what is outstanding, and whose answer an arriving one is.
+
+        /// <summary>
+        /// Which question is current. Bumped by every new one and checked by every answer:
+        /// browsing a list of tables asks about each in turn, and the slower answer to the
+        /// earlier question must not land on top of the later one.
+        /// </summary>
+        private int _generation;
+
+        private bool _loadingEntities;
+        private bool _loadingForms;
+        private bool _loadingHandlers;
+        private bool _writing;
+        private bool _savingFile;
+
+        /// <summary>What went wrong with the last thing asked, or null. Outlives its dialog.</summary>
+        private string _trouble;
+
+        /// <summary>What the form on screen adds up to, once it has actually arrived.</summary>
+        private string _handlerSummary = "";
+
+        /// <summary>
+        /// Whether anything is happening to the form on screen. Everything that reads the handler
+        /// grid or rewrites the form is dead while this is true, because the grid is either empty
+        /// or about to be replaced by an answer that has not arrived.
+        /// </summary>
+        private bool FormBusy
+        {
+            get { return _loadingForms || _loadingHandlers || _writing || _savingFile; }
+        }
+
         // Left panel
         private SplitContainer _mainSplit;
         private SplitContainer _leftSplit;
@@ -364,9 +400,18 @@ namespace Events2Code
                 return;
             }
 
+            var generation = StartFetch();
+            _loadingEntities = true;
+            UpdateState();
+
             WorkAsync(new WorkAsyncInfo
             {
                 Message = "Loading tables...",
+                // Every table in the environment is the heaviest request this tool makes, and on
+                // a slow link it is most of a minute. The query on the wire cannot be recalled,
+                // but waiting for it can be given up on - which without this was only possible by
+                // closing the tab.
+                IsCancelable = true,
                 Work = (worker, args) =>
                 {
                     var req = new RetrieveAllEntitiesRequest
@@ -374,13 +419,35 @@ namespace Events2Code
                         EntityFilters = EntityFilters.Entity,
                         RetrieveAsIfPublished = true
                     };
-                    args.Result = (RetrieveAllEntitiesResponse)Service.Execute(req);
+                    var response = (RetrieveAllEntitiesResponse)Service.Execute(req);
+                    if (worker.CancellationPending)
+                    {
+                        args.Cancel = true;
+                        return;
+                    }
+
+                    args.Result = response;
                 },
                 PostWorkCallBack = result =>
                 {
+                    // The tab may have been closed while this was in the air, and on a slow link
+                    // that is a window seconds wide rather than milliseconds. Nobody is owed an
+                    // answer, a dialog least of all.
+                    if (Landed(generation)) return;
+
+                    _loadingEntities = false;
+
+                    // Cancelled before Result, which rethrows after a cancel or an error.
+                    if (result.Cancelled)
+                    {
+                        _trouble = "Cancelled. Press Load Tables to ask again.";
+                        UpdateState();
+                        return;
+                    }
+
                     if (result.Error != null)
                     {
-                        MessageBox.Show(result.Error.Message, "Error loading tables", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        Blame("The tables could not be read", result.Error, "Error loading tables");
                         return;
                     }
 
@@ -396,8 +463,41 @@ namespace Events2Code
                         .ToList();
 
                     FillEntityList();
+                    UpdateState();
                 }
             });
+        }
+
+        /// <summary>
+        /// Starts a new question, and says so: whatever is on its way belongs to the old one and
+        /// its answer is nobody's when it lands. Returns the generation to check on arrival.
+        /// </summary>
+        private int StartFetch()
+        {
+            _trouble = null;
+            return ++_generation;
+        }
+
+        /// <summary>
+        /// Whether this answer has nowhere to go: the tab was closed while it was in the air, or
+        /// somebody asked something else in the meantime and this is the reply to the older
+        /// question. Either way it is not to be rendered, and not to be spoken about.
+        /// </summary>
+        private bool Landed(int generation)
+        {
+            return IsDisposed || generation != _generation;
+        }
+
+        /// <summary>
+        /// Says what failed, twice: once in a dialog, which is read and dismissed, and once on the
+        /// status line, which stays. An environment that could not be reached must not go on
+        /// reading as an environment with nothing in it.
+        /// </summary>
+        private void Blame(string what, Exception error, string caption)
+        {
+            _trouble = what + ": " + error.Message;
+            UpdateState();
+            MessageBox.Show(error.Message, caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
         private void FillEntityList()
@@ -431,9 +531,21 @@ namespace Events2Code
 
         private void LoadForms(string logicalName)
         {
+            // The table selection has already moved, so the forms of the one before it are no
+            // longer an answer to anything on screen - and neither is the form opened out of
+            // them. Both go now rather than when the new answer arrives, because the gap between
+            // those two moments is the whole of what a slow link adds.
+            var generation = StartFetch();
+            _loadingForms = true;
+            _lvForms.Items.Clear();
+            _selectedForm = null;
+            ClearForm();
+            UpdateState();
+
             WorkAsync(new WorkAsyncInfo
             {
                 Message = "Loading forms...",
+                IsCancelable = true,
                 Work = (worker, args) =>
                 {
                     var query = new QueryExpression("systemform")
@@ -449,13 +561,33 @@ namespace Events2Code
                         },
                         Orders = { new OrderExpression("name", OrderType.Ascending) }
                     };
-                    args.Result = Service.RetrieveMultiple(query);
+                    var found = Service.RetrieveMultiple(query);
+                    if (worker.CancellationPending)
+                    {
+                        args.Cancel = true;
+                        return;
+                    }
+
+                    args.Result = found;
                 },
                 PostWorkCallBack = result =>
                 {
+                    if (Landed(generation)) return;
+
+                    _loadingForms = false;
+
+                    if (result.Cancelled)
+                    {
+                        _trouble = "Cancelled. Click the table again to ask once more.";
+                        UpdateState();
+                        return;
+                    }
+
                     if (result.Error != null)
                     {
-                        MessageBox.Show(result.Error.Message, "Error loading forms", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        // The list is already empty, and stays that way: a table whose forms
+                        // could not be read must not read as a table with no forms either.
+                        Blame("The forms could not be read", result.Error, "Error loading forms");
                         return;
                     }
 
@@ -479,7 +611,7 @@ namespace Events2Code
                     }
                     _lvForms.EndUpdate();
 
-                    ClearResults();
+                    UpdateState();
                 }
             });
         }
@@ -488,47 +620,70 @@ namespace Events2Code
         {
             if (_lvForms.SelectedItems.Count == 0) return;
             _selectedForm = (FormItem)_lvForms.SelectedItems[0].Tag;
-            LoadFormXml();
+            LoadFormXml(_selectedForm);
         }
 
-        private void LoadFormXml()
+        private void LoadFormXml(FormItem form)
         {
-            var form = _selectedForm;
+            // Same reasoning as the forms list: the grid, the code and the buttons over them all
+            // describe the form clicked before this one, and a person reading them while this
+            // answer is on its way is reading about the wrong form.
+            var generation = StartFetch();
+            _loadingHandlers = true;
+            ClearForm();
+            UpdateState();
+
             WorkAsync(new WorkAsyncInfo
             {
                 Message = "Loading form XML...",
+                IsCancelable = true,
                 Work = (worker, args) =>
                 {
-                    args.Result = Service.Retrieve("systemform", form.Id, new ColumnSet("formxml"));
+                    var found = Service.Retrieve("systemform", form.Id, new ColumnSet("formxml"));
+                    if (worker.CancellationPending)
+                    {
+                        args.Cancel = true;
+                        return;
+                    }
+
+                    args.Result = found;
                 },
                 PostWorkCallBack = result =>
                 {
-                    if (result.Error != null)
+                    if (Landed(generation)) return;
+
+                    _loadingHandlers = false;
+
+                    if (result.Cancelled)
                     {
-                        MessageBox.Show(result.Error.Message, "Error loading form", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        _trouble = "Cancelled. Click the form again to ask once more.";
+                        UpdateState();
                         return;
                     }
 
-                    _currentFormXml = ((Entity)result.Result).GetAttributeValue<string>("formxml");
+                    if (result.Error != null)
+                    {
+                        Blame("The form could not be read", result.Error, "Error loading form");
+                        return;
+                    }
 
+                    var formXml = ((Entity)result.Result).GetAttributeValue<string>("formxml");
+
+                    List<EventHandlerInfo> handlers;
                     try
                     {
-                        _handlers = FormXmlParser.Parse(_currentFormXml).Handlers;
+                        handlers = FormXmlParser.Parse(formXml).Handlers;
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show(ex.Message, "Error parsing form XML", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        Blame("The form XML could not be read", ex, "Error parsing form XML");
                         return;
                     }
 
+                    _currentFormXml = formXml;
+                    _handlers = handlers;
                     FillHandlersGrid();
-
-                    _btnGenerate.Enabled = _handlers.Any(h => h.IsConvertible);
-                    _btnUnregister.Enabled = false;
-                    _btnCopy.Enabled = false;
-                    _btnSave.Enabled = false;
-                    _generatedCode = "";
-                    _txtCode.Clear();
+                    UpdateState();
 
                     if (form.IsManaged)
                         MessageBox.Show("This form is managed. Unregistering handlers will create an unmanaged customization on top of it.",
@@ -576,7 +731,10 @@ namespace Events2Code
             FitHandlerPane();
 
             var convertible = _handlers.Count(h => h.IsConvertible);
-            _lblStatus.Text = _handlers.Count == 0
+            // Held rather than written straight to the label: it is a sentence about a form that
+            // has arrived, and while the next one is on its way the label has something truer to
+            // say. UpdateState decides which of the two is showing.
+            _handlerSummary = _handlers.Count == 0
                 ? "No handlers registered on this form."
                 : _handlers.Count + " handler(s), " + convertible + " convertible";
         }
@@ -621,19 +779,40 @@ namespace Events2Code
                 e.NewValue = CheckState.Unchecked;
         }
 
-        private void ClearResults()
+        /// <summary>Everything on screen that was read out of one particular form.</summary>
+        private void ClearForm()
         {
-            _selectedForm = null;
             _currentFormXml = null;
             _handlers = new List<EventHandlerInfo>();
             _lvHandlers.Items.Clear();
-            _lblStatus.Text = "";
+            _handlerSummary = "";
             _generatedCode = "";
             _txtCode.Clear();
-            _btnGenerate.Enabled = false;
-            _btnCopy.Enabled = false;
-            _btnSave.Enabled = false;
-            _btnUnregister.Enabled = false;
+        }
+
+        /// <summary>
+        /// The toolbar and the status line, made to agree with what is actually true. One place,
+        /// called from every path in and out of a fetch, because the failure paths are where a
+        /// button that disables itself gets left dead for the rest of the session.
+        /// </summary>
+        private void UpdateState()
+        {
+            _btnLoadEntities.Enabled = !_loadingEntities;
+
+            var hasCode = _generatedCode.Length > 0;
+            _btnGenerate.Enabled = !FormBusy && _handlers.Any(h => h.IsConvertible);
+            _btnCopy.Enabled = !FormBusy && hasCode;
+            _btnSave.Enabled = !FormBusy && hasCode;
+            _btnUnregister.Enabled = !FormBusy && hasCode && _currentFormXml != null;
+
+            _lblStatus.Text =
+                _trouble != null ? _trouble :
+                _loadingEntities ? "Loading tables..." :
+                _loadingForms ? "Loading forms..." :
+                _loadingHandlers ? "Loading form..." :
+                _writing ? "Updating form..." :
+                _savingFile ? "Saving..." :
+                _handlerSummary;
         }
 
         // ===== Generate =====
@@ -664,22 +843,48 @@ namespace Events2Code
 
             _generatedCode = JsCodeGenerator.Generate(selected, bootstrapFn, _selectedEntity, _selectedForm?.Name ?? "");
             JsSyntaxHighlighter.Apply(_txtCode, _generatedCode);
-            _btnCopy.Enabled = true;
-            _btnSave.Enabled = true;
-            _btnUnregister.Enabled = true;
+            UpdateState();
         }
 
         private void BtnSave_Click(object sender, EventArgs e)
         {
+            string path;
             using (var dialog = new SaveFileDialog
             {
                 Filter = "JavaScript files (*.js)|*.js|All files (*.*)|*.*",
                 FileName = (_selectedEntity ?? "form") + "_events.js"
             })
             {
-                if (dialog.ShowDialog() == DialogResult.OK)
-                    File.WriteAllText(dialog.FileName, _generatedCode);
+                if (dialog.ShowDialog() != DialogResult.OK) return;
+                path = dialog.FileName;
             }
+
+            // A file dialog is as likely to be pointed at a share or a synced folder as at the
+            // local disk, and both of those block for as long as the network takes to give up.
+            // Nothing that can hang belongs on the thread that draws the window.
+            var code = _generatedCode;
+            _savingFile = true;
+            UpdateState();
+
+            WorkAsync(new WorkAsyncInfo
+            {
+                Message = "Saving " + Path.GetFileName(path) + "...",
+                Work = (worker, args) => File.WriteAllText(path, code),
+                PostWorkCallBack = result =>
+                {
+                    if (IsDisposed) return;
+
+                    _savingFile = false;
+
+                    if (result.Error != null)
+                    {
+                        Blame("The file could not be written", result.Error, "Error saving file");
+                        return;
+                    }
+
+                    UpdateState();
+                }
+            });
         }
 
         // ===== Unregister =====
@@ -713,9 +918,17 @@ namespace Events2Code
             var entity = _selectedEntity;
             var formXml = _currentFormXml;
 
+            // Held down for the duration of its own write. Two presses would be two rewrites of
+            // the same form, and the second takes as its "before" state a form the first has
+            // already stripped - so the backup meant to be the way back is a copy of the damage.
+            _writing = true;
+            UpdateState();
+
             WorkAsync(new WorkAsyncInfo
             {
                 Message = "Updating form and publishing...",
+                // Deliberately not cancelable: a form update followed by a publish is not a
+                // question that can be taken back halfway through.
                 Work = (worker, args) =>
                 {
                     Directory.CreateDirectory(backupDir);
@@ -738,14 +951,22 @@ namespace Events2Code
                 },
                 PostWorkCallBack = result =>
                 {
+                    // No generation check: unlike a fetch, a write that has happened has to be
+                    // reported whatever has been clicked since. Only a closed tab excuses it.
+                    if (IsDisposed) return;
+
+                    _writing = false;
+
                     if (result.Error != null)
                     {
-                        MessageBox.Show(result.Error.Message, "Error updating form", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        Blame("The form could not be updated", result.Error, "Error updating form");
                         return;
                     }
 
+                    UpdateState();
                     MessageBox.Show("Form updated and published.\nBackup saved to:\n" + result.Result, "Done", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    LoadFormXml();
+                    // The form it wrote, not whatever is selected by now.
+                    LoadFormXml(form);
                 }
             });
         }
