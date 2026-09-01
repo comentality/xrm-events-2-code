@@ -24,10 +24,21 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if (-not (Get-Module -ListAvailable XtbSandbox)) {
+# Install-Module puts the module where only the installing edition of PowerShell looks —
+# Documents\PowerShell\Modules for 7, Documents\WindowsPowerShell\Modules for 5.1 — so
+# check both, and a sibling checkout, before concluding it is not installed at all.
+$xtbSandbox = if (Get-Module -ListAvailable XtbSandbox) { "XtbSandbox" } else {
+    $docs = [Environment]::GetFolderPath("MyDocuments")
+    @(
+        (Join-Path $docs "PowerShell\Modules\XtbSandbox")
+        (Join-Path $docs "WindowsPowerShell\Modules\XtbSandbox")
+        (Join-Path $PSScriptRoot "..\..\xrmtoolbox-sandbox\XtbSandbox")
+    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
+if (-not $xtbSandbox) {
     throw "XtbSandbox is not installed. Run: Install-Module XtbSandbox -Scope CurrentUser`n(see https://github.com/comentality/xrmtoolbox-sandbox)"
 }
-Import-Module XtbSandbox
+Import-Module $xtbSandbox
 
 Start-XtbSandbox @PSBoundParameters `
     -InstanceRoot   (Join-Path $PSScriptRoot ".xtb") `
