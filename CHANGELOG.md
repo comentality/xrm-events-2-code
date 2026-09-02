@@ -8,6 +8,11 @@ All notable changes to Events2Code are recorded here. The format follows
 
 ### Fixed
 
+- **Changing the connection now clears the last environment's tables, forms and handlers from the
+  window.** The form left selected across a change was the dangerous part: its id is what
+  Unregister and Generate write back to, so a write meant for one environment could land in
+  another. Anything still on the wire when the connection changes is discarded too, rather than
+  arriving to fill the new environment's window with the old one's answers.
 - **The forms list and the handler grid now belong to whatever was clicked last.** Clicking through
   tables or forms on a slow connection used to leave the slower answer on screen under a newer
   selection, so the grid described one form while everything acting on it pointed at another.

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Events2Code.Logic;
+using McTools.Xrm.Connection;
 using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
@@ -388,6 +389,53 @@ namespace Events2Code
         {
             if (box.IsHandleCreated)
                 SendMessage(box.Handle, EM_SETCUEBANNER, IntPtr.Zero, text);
+        }
+
+        // ===== the environment changing under the window =====
+
+        /// <summary>
+        /// A different environment, handed over by XrmToolBox.
+        ///
+        /// Everything on screen belongs to the org it was read from: the tables, the form opened
+        /// out of them, the handlers in the grid and the code written from them. None of it is
+        /// this org's, and the form is the dangerous one - its id is the thing Unregister and
+        /// Generate write back to, and an id from one environment applied to another is a write
+        /// nobody asked for. So the window lets go of the old org before it takes up the new one.
+        ///
+        /// The generation moves on for the same reason it moves on anywhere else here: whatever
+        /// is still on the wire was asked of somewhere else, and its answer must land on nobody.
+        /// </summary>
+        public override void UpdateConnection(IOrganizationService newService, ConnectionDetail detail,
+                                              string actionName, object parameter)
+        {
+            var busy = _loadingEntities || _loadingForms || _loadingHandlers || _writing;
+
+            _generation++;
+            _loadingEntities = false;
+            _loadingForms = false;
+            _loadingHandlers = false;
+            _writing = false;
+            _trouble = null;
+
+            _entities = new List<EntityItem>();
+            _selectedEntity = null;
+            _selectedForm = null;
+            _lvEntities.Items.Clear();
+            _lvForms.Items.Clear();
+            ClearForm();
+
+            // Only what was cancelable is cancelled, and only when something was out: on a slow
+            // link the rest of a question asked of an org nobody is looking at is worth stopping.
+            if (busy) CancelWorker();
+
+            // After the window has let go, not before. When a connection is made because
+            // somebody pressed a button, it arrives carrying that method's name and the base
+            // class runs it as its last act - so a reset placed after this call would throw away
+            // the load the connection was made for. Nothing here asks XrmToolBox for a
+            // connection today, but the ordering is not worth being wrong about later.
+            base.UpdateConnection(newService, detail, actionName, parameter);
+
+            UpdateState();
         }
 
         // ===== Entities =====

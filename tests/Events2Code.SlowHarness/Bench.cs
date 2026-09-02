@@ -54,6 +54,17 @@ namespace Events2Code.SlowHarness
         {
             if (!ok) Failures.Add(Clock.ElapsedMilliseconds + "ms  " + what);
         }
+
+        /// <summary>
+        /// Hands the tool a different environment, the way XrmToolBox does when the connection in
+        /// the toolbar changes. The empty action name is what a plain change carries; anything
+        /// else and the base class goes looking for a method of that name to run.
+        /// </summary>
+        public void SwitchTo(SlowService service)
+        {
+            Control.UpdateConnection(service, new McTools.Xrm.Connection.ConnectionDetail(), "", null);
+            Service = service;
+        }
     }
 
     public class Scenario

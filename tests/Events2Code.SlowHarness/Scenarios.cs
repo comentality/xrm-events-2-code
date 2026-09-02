@@ -58,6 +58,7 @@ namespace Events2Code.SlowHarness
                 LoadFails(),
                 FormsFail(),
                 WriteGuarded(),
+                SwitchOrgLetsGo(),
             };
         }
 
@@ -428,6 +429,61 @@ namespace Events2Code.SlowHarness
                         + " - the second is a copy of the first write's damage");
                     r.Check(r.Dialogs.Count(d => d.IndexOf("Done", StringComparison.OrdinalIgnoreCase) >= 0) == 1,
                         "one write, one report, and the dialogs were: " + string.Join(" | ", r.Dialogs));
+                });
+        }
+
+        /// <summary>
+        /// The connection changes with a form open and its handlers still on the way.
+        ///
+        /// Everything on screen was read from the org being left, and the form is the one that
+        /// matters: its id is what Unregister and Generate write back to, so a form left selected
+        /// across a connection change is a write aimed at one environment landing in another. The
+        /// window has to let go of all of it, and the answer still in the air has to land on
+        /// nobody - the same rule as any other question asked here and then abandoned.
+        /// </summary>
+        private static Scenario SwitchOrgLetsGo()
+        {
+            return new Scenario
+            {
+                Name = "switch-org-lets-go",
+                Why = "nothing read from one environment may be left on screen, or written to, in another",
+                Wire = s => s.Latency = Slow("formxml", 3000)
+            }
+                .At(200, "press Load Tables", r => r.Probe.PressLoad())
+                .At(1200, "click a table", r => r.Probe.SelectEntity(Contact))
+                .At(2200, "open a form", r => r.Probe.SelectForm(ShowcaseForm))
+                .At(2600, "switch to another org while its handlers are still coming", r =>
+                {
+                    var old = r.Service;
+                    r.SwitchTo(SlowService.Sampled());
+
+                    r.Check(r.Probe.EntityNames().Count == 0,
+                        "the last org's tables should have gone with its connection, and the list holds: "
+                        + string.Join(", ", r.Probe.EntityNames()));
+                    r.Check(r.Probe.FormNames().Count == 0,
+                        "and its forms, and the list holds: " + string.Join(", ", r.Probe.FormNames()));
+                    r.Check(r.Probe.HandlerFunctions().Count == 0,
+                        "and its handlers, and the grid holds: "
+                        + string.Join(", ", r.Probe.HandlerFunctions()));
+                    r.Check(r.Probe.Code.Length == 0,
+                        "and the code written from them, which reads: " + r.Probe.Code);
+                    r.Check(!r.Probe.Unregister.Enabled && !r.Probe.Generate.Enabled,
+                        "with nothing to write to, neither writing button may be pressable");
+                    r.Check(r.Probe.Load.Enabled,
+                        "and Load should be live for the new org rather than dead behind an abandoned fetch");
+
+                    r.Service = old;
+                })
+                .At(6000, "the old org's answer lands on nobody", r =>
+                {
+                    r.Check(r.Probe.HandlerFunctions().Count == 0,
+                        "the form opened in the last org must not fill this one's grid, and it holds: "
+                        + string.Join(", ", r.Probe.HandlerFunctions()));
+                    r.Check(!r.Probe.Unregister.Enabled,
+                        "nor may it make a write possible against an environment it was never read from");
+                    r.Check(r.Service.Log("update").Count == 0,
+                        "and nothing may have been written, but the old org saw "
+                        + r.Service.Log("update").Count + " updates");
                 });
         }
     }
