@@ -13,31 +13,39 @@ All notable changes to Events2Code are recorded here. The format follows
   Unregister and Generate write back to, so a write meant for one environment could land in
   another. Anything still on the wire when the connection changes is discarded too, rather than
   arriving to fill the new environment's window with the old one's answers.
-- **The forms list and the handler grid now belong to whatever was clicked last.** Clicking through
-  tables or forms on a slow connection used to leave the slower answer on screen under a newer
-  selection, so the grid described one form while everything acting on it pointed at another.
-- **Load Tables, Generate, Save and Unregister go dead while the thing they act on is still
-  arriving, and come back when it lands or fails.** Two presses of Unregister used to be two
+- **The forms list and the handler grid now show what was clicked last, even when an earlier
+  answer lands later.** Clicking through tables or forms on a slow connection used to leave the
+  slower answer on screen under a newer selection, so the grid described one form while
+  everything acting on it pointed at another.
+- **Load Tables, Generate, Save and Unregister go dead while what they act on is still
+  arriving.** They come back when it lands or fails. Two presses of Unregister used to be two
   rewrites of the same form, the second taking as its "before" state a form the first had
   already stripped — so the backup meant to be the way back was a copy of the damage.
-- **A fetch that fails now says so where it can still be read after the dialog is gone.** A table
-  list that could not be loaded no longer looks like an environment with no tables, and a table
-  whose forms could not be read no longer shows the previous table's forms.
+- **A fetch that fails now says so on the status line, where it can still be read after the
+  dialog is gone.** A table list that could not be loaded no longer looks like an environment
+  with no tables, and a table whose forms could not be read no longer shows the previous
+  table's forms.
 - **The status line no longer counts handlers of a form that is still loading, and says what it
-  is waiting for instead.** "No handlers registered on this form" is now a statement about a form the
-  tool has read.
-- **Loading tables, forms and a form's XML can be cancelled from the panel's Cancel button,
-  which the tool never offered before.** Cancelling says so and leaves nothing stuck.
+  is waiting for instead.** "No handlers registered on this form" is now a statement about a
+  form the tool has read.
+- **Loading tables, forms and a form's XML can now be cancelled from the panel's Cancel
+  button.** The tool never offered one before. Cancelling says so and leaves nothing stuck.
 - **Closing the tab mid-fetch no longer puts an error dialog up afterwards, over whatever you
   moved on to.**
 - **Saving the generated file happens off the UI thread, so a save to a share that is down no
   longer freezes the window.**
 
+### Changed
+
+- The tool's home is now [comentality.com/tools](https://comentality.com/tools/#events2code):
+  the package page's project link goes there, and the README says so. The source and these
+  notes stay on GitHub.
+
 ### Added
 
 - `tests\slow.ps1`, a harness that drives the real control against a Dataverse that takes
-  seconds to answer: ten scenarios, a screenshot per gesture, and a line per finding. Every fix
-  above has one that failed before it.
+  seconds to answer: eleven scenarios, a screenshot per gesture, and a line per finding. Every
+  fix above but the save has one that failed before it.
 
 ## [1.0.0] - 2026-08-17
 
