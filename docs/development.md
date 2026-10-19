@@ -139,14 +139,21 @@ Releases are unaffected, since step 1 below bumps the version anyway.
 
 ## Releasing
 
-1. Bump `<Version>` in `Events2Code\Events2Code.csproj` and `<version>` in
-   `Events2Code\Events2Code.nuspec`, and add the release to `CHANGELOG.md`.
-2. Update `<releaseNotes>` in the nuspec.
+1. Set `<Version>` in `Events2Code\Events2Code.csproj` and `<version>` in
+   `Events2Code\Events2Code.nuspec` to the release, and stamp `## Unreleased` in `CHANGELOG.md`
+   as `## [X.Y.Z] - date`, with its link at the bottom.
+2. `.\release-notes.ps1 -Write` regenerates `<releaseNotes>` in the nuspec from the bolded leads
+   of the changelog, and commit the result. `.\release-notes.ps1 -Preview` shows beforehand what
+   the store will get; only a bullet whose lead is bolded ships.
 3. `dotnet build Events2Code\Events2Code.csproj -c Release` and check the tool once in the
    sandbox instance.
-4. Tag `vX.Y.Z`, push, and create the GitHub release with `Events2Code.dll` attached.
+4. Tag `vX.Y.Z`, push, and create the GitHub release with `Events2Code.dll` attached. The store
+   notes end with a link to that release, so it has to exist before the package does.
 5. `.\publish.ps1` pushes the package to nuget.org, which is where the XrmToolBox Tool Library
-   installs it from. The API key comes from `-ApiKey` or from `.nuget-apikey` (gitignored).
+   installs it from. It runs `.\release-notes.ps1 -Check` first and refuses notes that were never
+   regenerated. The API key comes from `-ApiKey` or from `.nuget-apikey` (gitignored).
+6. Open the next development version: the next patch plus `-dev` (1.1.0 ships, main becomes
+   `1.1.1-dev`) in both files, and a fresh `## Unreleased` heading.
 
 A package version can be unlisted on nuget.org but never replaced, so publish last, after the
 release is tagged and the DLL has been tried.
