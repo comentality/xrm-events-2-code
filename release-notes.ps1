@@ -36,6 +36,8 @@ if ($Check) {
 } elseif ($Write) {
     Update-XtbReleaseNotes -Nuspec $nuspec -Changelog $changelog | Out-Null
 } else {
+    # GitHub, not the nuspec's projectUrl: this builds the "full changelog" link to a release
+    # tag, which only the repository has. -Write and -Check take it from <repository> instead.
     ConvertTo-XtbReleaseNotes `
         -Path       $changelog `
         -ProjectUrl "https://github.com/comentality/xrm-events-2-code" `

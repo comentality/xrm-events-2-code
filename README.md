@@ -12,6 +12,9 @@ code it calls. The modern approach is to register everything from a single OnLoa
 the Client API (`addOnChange`, `addOnSave`, `addTabStateChange`, …). Events2Code automates the
 migration.
 
+Its home is [comentality.com/tools](https://comentality.com/tools/#events2code); this repository
+is where it is built.
+
 ![Events2Code showing a form's handlers and the generated bootstrap](https://raw.githubusercontent.com/comentality/xrm-events-2-code/main/docs/images/overview.png)
 
 ## Install

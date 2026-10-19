@@ -6,7 +6,7 @@
     <title>Events2Code</title>
     <authors>Comentality</authors>
     <license type="expression">MIT</license>
-    <projectUrl>https://github.com/comentality/xrm-events-2-code</projectUrl>
+    <projectUrl>https://comentality.com/tools/#events2code</projectUrl>
     <repository type="git" url="https://github.com/comentality/xrm-events-2-code.git" branch="main" />
     <icon>icon.png</icon>
     <readme>docs\README.md</readme>
