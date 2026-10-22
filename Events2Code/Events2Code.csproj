@@ -4,7 +4,7 @@
     <OutputType>Library</OutputType>
     <AssemblyName>Events2Code</AssemblyName>
     <RootNamespace>Events2Code</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.1.1-dev</Version>
     <UseWindowsForms>true</UseWindowsForms>
     <Company>Comentality</Company>
     <Authors>Comentality</Authors>

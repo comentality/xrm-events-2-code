@@ -4,6 +4,8 @@ All notable changes to Events2Code are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [semantic versioning](https://semver.org/).
 
+## Unreleased
+
 ## [1.1.0] - 2026-10-22
 
 ### Fixed
