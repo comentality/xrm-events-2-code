@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
   <metadata>
     <id>Comentality.Events2Code</id>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <title>Events2Code</title>
     <authors>Comentality</authors>
     <license type="expression">MIT</license>
@@ -11,7 +11,15 @@
     <icon>icon.png</icon>
     <readme>docs\README.md</readme>
     <description>Convert Dynamics 365 form event handler registrations made in the form designer UI into equivalent JavaScript code, and unregister them from the form.</description>
-    <releaseNotes>v1.0.0
+    <releaseNotes>v1.1.0
+- Changing the connection now clears the old environment from the window, so no write can land in the wrong one.
+- On a slow connection the forms list and handler grid always show what you clicked last, and the buttons wait for it.
+- Loading tables, forms and a form's XML can now be cancelled from the Cancel button on the loading panel.
+- A failed load now stays on the status line, which also says what is still loading instead of counting too early.
+- Closing the tab mid-load no longer pops up an error later, and a save to a dead share no longer freezes the window.
+Full changelog, with screenshots: https://github.com/comentality/xrm-events-2-code/releases/tag/v1.1.0
+
+v1.0.0
 - Browse tables and their Main and Quick Create forms over an XrmToolBox connection, with a filter on display or logical name.
 - List every event handler a form registers through the designer, with its event, target, function, library and enabled state.
 - Generate a single OnLoad bootstrap function that registers the checked handlers through the Client API.
@@ -20,7 +28,6 @@
 - Unregister the checked handlers: they leave the form XML, the bootstrap is registered on form OnLoad, and the table is published.
 - Back up the form XML to Documents\Events2Code\backups before any change, and warn on managed forms.
 - The generated-code preview is syntax highlighted.
-Full changelog, with screenshots: https://github.com/comentality/xrm-events-2-code/releases/tag/v1.0.0
 </releaseNotes>
     <tags>XrmToolBox Dynamics365 CRM PowerPlatform JavaScript FormEvents</tags>
     <dependencies>
